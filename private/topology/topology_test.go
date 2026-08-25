@@ -193,7 +193,7 @@ func TestIFInfoMap(t *testing.T) {
 		1: IFInfo{
 			ID:           1,
 			BRName:       "br1-ff00:0:311-1",
-			InternalAddr: netip.MustParseAddrPort("10.1.0.1:0"),
+			InternalAddrs: []netip.AddrPort{netip.MustParseAddrPort("10.1.0.1:0")},
 			Provider:     "udpip",
 			Local:        "192.0.2.1:44997",
 			Remote:       "192.0.2.2:44998",
@@ -209,7 +209,7 @@ func TestIFInfoMap(t *testing.T) {
 		3: IFInfo{
 			ID:           3,
 			BRName:       "br1-ff00:0:311-1",
-			InternalAddr: netip.MustParseAddrPort("10.1.0.1:0"),
+			InternalAddrs: []netip.AddrPort{netip.MustParseAddrPort("10.1.0.1:0")},
 			Provider:     "udpip",
 			Local:        "[2001:db8:a0b:12f0::1]:44997",
 			Remote:       "[2001:db8:a0b:12f0::2]:44998",
@@ -220,7 +220,7 @@ func TestIFInfoMap(t *testing.T) {
 		8: IFInfo{
 			ID:           8,
 			BRName:       "br1-ff00:0:311-1",
-			InternalAddr: netip.MustParseAddrPort("10.1.0.1:0"),
+			InternalAddrs: []netip.AddrPort{netip.MustParseAddrPort("10.1.0.1:0")},
 			Provider:     "udpip",
 			Local:        ":44997",
 			Remote:       "192.0.2.3:44998",
@@ -231,7 +231,7 @@ func TestIFInfoMap(t *testing.T) {
 		11: IFInfo{
 			ID:           11,
 			BRName:       "br1-ff00:0:311-2",
-			InternalAddr: netip.MustParseAddrPort(`[2001:db8:a0b:12f0::1%some-internal-zone]:0`),
+			InternalAddrs: []netip.AddrPort{netip.MustParseAddrPort(`[2001:db8:a0b:12f0::1%some-internal-zone]:0`)},
 			Provider:     "udpip",
 			Local:        `[2001:db8:a0b:12f0::1%some-local-zone]:44897`,
 			Remote:       `[2001:db8:a0b:12f0::2%some-remote-zone]:44898`,
@@ -250,7 +250,7 @@ func TestIFInfoMapCoreAS(t *testing.T) {
 		91: IFInfo{
 			ID:           91,
 			BRName:       "borderrouter6-ff00:0:362-1",
-			InternalAddr: netip.MustParseAddrPort("10.1.0.1:0"),
+			InternalAddrs: []netip.AddrPort{netip.MustParseAddrPort("10.1.0.1:0")},
 			Provider:     "udpip",
 			Local:        "192.0.2.1:4997",
 			Remote:       "192.0.2.2:4998",
@@ -261,7 +261,7 @@ func TestIFInfoMapCoreAS(t *testing.T) {
 		32: IFInfo{
 			ID:           32,
 			BRName:       "borderrouter6-ff00:0:362-9",
-			InternalAddr: netip.MustParseAddrPort("[2001:db8:a0b:12f0::2]:0"),
+			InternalAddrs: []netip.AddrPort{netip.MustParseAddrPort("[2001:db8:a0b:12f0::2]:0")},
 			Provider:     "udpip",
 			Local:        "[2001:db8:a0b:12f0::1]:4997",
 			Remote:       "[2001:db8:a0b:12f0::2]:4998",

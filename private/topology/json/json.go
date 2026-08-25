@@ -94,9 +94,19 @@ type ServerInfo struct {
 // BRInfo contains Border Router specific information.
 type BRInfo struct {
 	InternalAddr string                    `json:"internal_addr"`
+	InternalAddrs []string                    `json:"internal_addrs"`
 	Interfaces   map[iface.ID]*BRInterface `json:"interfaces"`
 }
 
+func (i BRInfo) AllInternalAddrs() []string {
+	if len(i.InternalAddrs) > 0 {
+		return i.InternalAddrs
+	}
+	if i.InternalAddr != "" {
+		return []string{i.InternalAddr}
+	}
+	return nil
+}
 // GatewayInfo contains SCION gateway information.
 type GatewayInfo struct {
 	CtrlAddr   string   `json:"ctrl_addr"`
@@ -137,7 +147,7 @@ func (i ServerInfo) String() string {
 
 func (i BRInfo) String() string {
 	var s []string
-	s = append(s, fmt.Sprintf("Loc addrs:\n  %s\nInterfaces:", i.InternalAddr))
+	s = append(s, fmt.Sprintf("Loc addrs:\n  %s\nInterfaces:", strings.Join(i.AllInternalAddrs(), ", ")))
 	for ifID, intf := range i.Interfaces {
 		s = append(s, fmt.Sprintf("%d: %+v", ifID, intf))
 	}

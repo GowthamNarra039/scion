@@ -205,7 +205,7 @@ func TestRouterValidatorValidate(t *testing.T) {
 			loadOld: defaultTopo,
 			loadNew: topoWithModification(t, func(topo *topology.RWTopology) {
 				brInfo := topo.BR[id]
-				brInfo.InternalAddr = netip.AddrPortFrom(brInfo.InternalAddr.Addr(), 42)
+				brInfo.InternalAddrs = []netip.AddrPort{netip.AddrPortFrom(brInfo.InternalAddr.Addr(), 42)}
 				topo.BR[id] = brInfo
 			}),
 			assertErr: assert.Error,
@@ -214,7 +214,7 @@ func TestRouterValidatorValidate(t *testing.T) {
 			loadOld: defaultTopo,
 			loadNew: topoWithModification(t, func(topo *topology.RWTopology) {
 				brInfo := topo.BR[other]
-				brInfo.InternalAddr = netip.AddrPortFrom(brInfo.InternalAddr.Addr(), 42)
+				brInfo.InternalAddrs = []netip.AddrPort{netip.AddrPortFrom(brInfo.InternalAddr.Addr(), 42)}
 				topo.BR[other] = brInfo
 			}),
 			assertErr: assert.NoError,

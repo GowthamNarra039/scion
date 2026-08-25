@@ -15,11 +15,30 @@
 package topology
 
 import (
+	"net/netip"
 	"reflect"
 	"sync"
 
 	"github.com/scionproto/scion/pkg/private/serrors"
 )
+
+//reports whether two internal addr lists contain same multiset of addresses, ignoring order, assuming reorder of primary address is allowed on toplogy reload
+func sameInternalAddrSet(a, b []netip.AddrPort) bool{
+	if len(a)!=len(b){
+		return false
+	}
+	counts := make(map[netip.Addrport]int, len(a))
+	for _, ap := range a{
+		counts[ap]++
+	}
+	for _, ap:= range b{
+		counts[ap]--
+		if counts[ap] < 0 {
+			return false
+		}
+	}
+	return true
+}
 
 // DefaultValidator is the default topology update validator.
 type DefaultValidator struct {

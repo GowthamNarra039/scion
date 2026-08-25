@@ -161,8 +161,28 @@ func (t *topologyS) UnderlayNextHop(ifID iface.ID) (*net.UDPAddr, bool) {
 	if !ok {
 		return nil, false
 	}
-	return net.UDPAddrFromAddrPort(ifInfo.InternalAddr), true
+	prim:=ifInfo.PrimaryInternalAddr()
+	if !prim.IsValid(){
+		return nil,false
+	}
+	return net.UDPAddrFromAddrPort(prim), true
 }
+
+//returns all internal underlay addresses, 
+func (t *topologyS) UnderlayNextHops(ifID iface.ID) (*net.UDPAddr, bool){
+	ifInfo, ok := t.Topology.IFInfoMap[ifID]
+	if !ok{
+		return nil, false
+	}
+	hops := make([]*netip.UDPAddr,0, len(ifInfo.InternalAddrs))
+	for _,ap := range ifInfo.InternalAddrs {
+		hops = append(hops, net.UDPAddrFromAddrPort(ap))
+	}
+
+	return hops,true
+}
+
+
 
 func (t *topologyS) MakeHostInfos(st ServiceType) ([]*net.UDPAddr, error) {
 	var hostInfos []*net.UDPAddr
