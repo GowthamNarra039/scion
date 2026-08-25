@@ -169,7 +169,7 @@ func (t *topologyS) UnderlayNextHop(ifID iface.ID) (*net.UDPAddr, bool) {
 }
 
 //returns all internal underlay addresses, 
-func (t *topologyS) UnderlayNextHops(ifID iface.ID) (*net.UDPAddr, bool){
+func (t *topologyS) UnderlayNextHops(ifID iface.ID) ([]*net.UDPAddr, bool){
 	ifInfo, ok := t.Topology.IFInfoMap[ifID]
 	if !ok{
 		return nil, false
