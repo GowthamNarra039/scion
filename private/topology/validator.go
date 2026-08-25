@@ -27,7 +27,7 @@ func sameInternalAddrSet(a, b []netip.AddrPort) bool{
 	if len(a)!=len(b){
 		return false
 	}
-	counts := make(map[netip.Addrport]int, len(a))
+	counts := make(map[netip.AddrPort]int, len(a))
 	for _, ap := range a{
 		counts[ap]++
 	}
@@ -213,9 +213,9 @@ func (v *routerValidator) Immutable(new, old *RWTopology) error {
 	if err := v.generalValidator.Immutable(new, old); err != nil {
 		return err
 	}
-	if new.BR[v.id].InternalAddr.String() != old.BR[v.id].InternalAddr.String() {
+	if !sameInternalAddrSet(new.BR[v.id].InternalAddrs, old.BR[v.id].InternalAddrs) {
 		return serrors.New("InternalAddrs is immutable", "expected",
-			old.BR[v.id].InternalAddr, "actual", new.BR[v.id].InternalAddr)
+			old.BR[v.id].InternalAddrs, "actual", new.BR[v.id].InternalAddrs)
 	}
 	return nil
 }

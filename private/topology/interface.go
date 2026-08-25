@@ -174,7 +174,7 @@ func (t *topologyS) UnderlayNextHops(ifID iface.ID) (*net.UDPAddr, bool){
 	if !ok{
 		return nil, false
 	}
-	hops := make([]*netip.UDPAddr,0, len(ifInfo.InternalAddrs))
+	hops := make([]*net.UDPAddr,0, len(ifInfo.InternalAddrs))
 	for _,ap := range ifInfo.InternalAddrs {
 		hops = append(hops, net.UDPAddrFromAddrPort(ap))
 	}

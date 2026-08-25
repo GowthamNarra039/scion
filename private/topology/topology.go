@@ -169,7 +169,7 @@ func NewRWTopology() *RWTopology {
 //Returns first internal addr of the router or zero addr port if router has no internal addr
 func (b *BRInfo) PrimaryInternalAddr() netip.AddrPort{
 	if len(b.InternalAddrs) == 0 {
-		return b.netip.AddrPort{}
+		return netip.AddrPort{}
 	}
 	return b.InternalAddrs[0]
 }
@@ -177,7 +177,7 @@ func (b *BRInfo) PrimaryInternalAddr() netip.AddrPort{
 //Returns first internal addr of the router or zero addr port if router has no internal addr
 func (i *IFInfo) PrimaryInternalAddr() netip.AddrPort{
 	if len(i.InternalAddrs) == 0 {
-		return b.netip.AddrPort{}
+		return netip.AddrPort{}
 	}
 	return i.Internal_Addrs[0]
 }
@@ -236,7 +236,7 @@ func parseInternalAddrs(brName string, rawAddrs []string) ([]netip.AddrPort,erro
 			return nil, serrors.New("duplicate Internal Addrs", "br", brName, "Addr", raw)
 		}
 		seenExact[ap]= struct{}{}
-		fp := famport{is6: ap.Addr().Is6() && !ap.Addr().Is4In6(), port: ap.Port()}
+		fp := famPort{is6: ap.Addr().Is6() && !ap.Addr().Is4In6(), port: ap.Port()}
 		if _, dup := seenFamPort[fp]; dup{
 			return nil, serrors.New("two internal addresses of same family share a port", "br", brName, "addr", ap)
 		}
@@ -348,7 +348,7 @@ func validatePortRange(portRange string) (uint16, uint16, error) {
 func (t *RWTopology) populateBR(raw *jsontopo.Topology) error {
 	for name, rawBr := range raw.BorderRouters {
 		if rawBr.InternalAddr != "" && len(rawBr.InternalAddrs)>0 {
-			log.info("Both Internal_Addr and Internal_Addrs are set, Internal Addrs takes precedence ", "Br", name )
+			log.Info("Both Internal_Addr and Internal_Addrs are set, Internal Addrs takes precedence ", "Br", name )
 		}
 		intAddrs, err := parseInternalAddrs(name, rawBr.AllInternalAddrs())
 		if err != nil {
