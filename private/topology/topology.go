@@ -179,7 +179,7 @@ func (i *IFInfo) PrimaryInternalAddr() netip.AddrPort{
 	if len(i.InternalAddrs) == 0 {
 		return netip.AddrPort{}
 	}
-	return i.Internal_Addrs[0]
+	return i.InternalAddrs[0]
 }
 
 //Returns Addrs in order ipv6 first and ipv4 next
