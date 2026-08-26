@@ -141,14 +141,17 @@ func ConfigDataplane(dp Dataplane, cfg *Config) error {
 
 	// Add internal interfaces
 	if cfg.BR != nil {
+		// A router may bind more than one internal address (dual-stack). Each is
+		// registered as a separate internal interface. The addresses are netip
+		// addresses, so the provider is always udpip for now.
+
 		for _, ap := range cfg.BR.InternalAddrs{
 			if ap == (netip.AddrPort{}){
 				continue
 			}
-			host := addr.HostIP(cfg.BR.InternalAddr.Addr())
+			host := addr.HostIP(ap.Addr())
 			provider := "udpip" // Since BR.InternalInterface is always a netip.AddrPort
-			addr := cfg.BR.InternalAddr.String()
-			if err := dp.AddInternalInterface(cfg.IA, host, provider, addr); err != nil {
+			if err := dp.AddInternalInterface(cfg.IA, host, provider, ap.String()); err != nil {
 				return err
 			}
 		} // else TODO: what legitimate reason would there be to not have an internal addr?
