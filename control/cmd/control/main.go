@@ -1150,7 +1150,8 @@ func adaptInterfaceMap(in map[iface.ID]topology.IFInfo) map[uint16]ifstate.Inter
 			ID:           uint16(info.ID),
 			IA:           info.IA,
 			LinkType:     info.LinkType,
-			InternalAddr: info.InternalAddr,
+			//control service uses a single address to reach the owning router, we use primary(ipv6) internal address
+			InternalAddr: info.PrimaryInternalAddr(),
 			RemoteID:     uint16(info.RemoteIfID),
 			MTU:          uint16(info.MTU),
 		}
