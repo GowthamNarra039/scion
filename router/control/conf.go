@@ -141,9 +141,10 @@ func ConfigDataplane(dp Dataplane, cfg *Config) error {
 
 	// Add internal interfaces
 	if cfg.BR != nil {
-		if cfg.BR.InternalAddr != (netip.AddrPort{}) {
-			// The assumption that BR.InternalAddr is a netip address is endemic. Eradicating it
-			// will take a long time. Play along for now. The router is no-longer contagious.
+		for _, ap := range cfg.BR.InternalAddrs{
+			if ap == (netip.AddrPort{}){
+				continue
+			}
 			host := addr.HostIP(cfg.BR.InternalAddr.Addr())
 			provider := "udpip" // Since BR.InternalInterface is always a netip.AddrPort
 			addr := cfg.BR.InternalAddr.String()
@@ -238,11 +239,20 @@ func confExternalInterfaces(dp Dataplane, cfg *Config) error {
 			// point-of-view of the local router, the traffic must go through an intermediate
 			// link that connects the local router to its sibling. Until the config schema catches
 			// up, we use internal interfaces for sibling links.
+
+			//Both local router and owning router(sibling) router may have several initernal addresses
+			//A sibling link is a IP underlay connection, two ends must share a address family
+			//pickSiblingPair selects a family matched pair, ipv6 will be preferred when boths ends offer it
+			//If there is no common family the AS is misconfigured and fails
+			localSib, remoteSib, perr := pickSiblingPair(cfg.BR.InternalAddrs, iface.InternalAddrs)
+			if(perr!=nil){
+				return serrors.Wrap("selecting sibling link addresses",perr,"if_id",ifID,"local_addrs",cfg.BR.InternalAddrs,"sibling_addrs",iface.InternalAddrs)
+			}
 			linkInfo.Provider = "udpip" // For now, all internal interfaces use udp/ip.
-			linkInfo.Local.Addr = cfg.BR.InternalAddr.String()
-			linkInfo.Remote.Addr = iface.InternalAddr.String() // i.e. via sibling router.
-			localHost = addr.HostIP(cfg.BR.InternalAddr.Addr())
-			remoteHost = addr.HostIP(iface.InternalAddr.Addr())
+			linkInfo.Local.Addr = localSib.String()
+			linkInfo.Remote.Addr = remoteSib.String() // i.e. via sibling router.
+			localHost = addr.HostIP(localSib.Addr())
+			remoteHost = addr.HostIP(remoteSib.Addr())
 
 			// The link is between two AS-local routers. TODO(multi_underlay): double check it's
 			// not used for other purposes where the far router's AS is expected.
