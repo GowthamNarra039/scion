@@ -209,7 +209,7 @@ func (u *provider) Stop() {
 type udpConnection struct {
 	conn         router.BatchConn
 	name         string                     // for logs. It's more informative than ifID.
-	localaddr    netip.AddrPort             //bound local address, zero for non internal connections
+	localAddr    netip.AddrPort             //bound local address, zero for non internal connections
 	link         udpLink                    // Link with exclusive use of the connection.
 	links        map[netip.AddrPort]udpLink // Links that share this connection
 	queue        chan *router.Packet
