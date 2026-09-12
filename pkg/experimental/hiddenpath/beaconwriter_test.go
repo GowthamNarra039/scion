@@ -22,7 +22,6 @@ import (
 	"crypto/rand"
 	"hash"
 	"net"
-	"net/netip"
 	"sort"
 	"testing"
 	"time"
