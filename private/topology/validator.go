@@ -15,11 +15,30 @@
 package topology
 
 import (
+	"net/netip"
 	"reflect"
 	"sync"
 
 	"github.com/scionproto/scion/pkg/private/serrors"
 )
+
+//reports whether two internal addr lists contain same multiset of addresses, ignoring order, assuming reorder of primary address is allowed on toplogy reload
+func sameInternalAddrSet(a, b []netip.AddrPort) bool{
+	if len(a)!=len(b){
+		return false
+	}
+	counts := make(map[netip.AddrPort]int, len(a))
+	for _, ap := range a{
+		counts[ap]++
+	}
+	for _, ap:= range b{
+		counts[ap]--
+		if counts[ap] < 0 {
+			return false
+		}
+	}
+	return true
+}
 
 // DefaultValidator is the default topology update validator.
 type DefaultValidator struct {
@@ -194,9 +213,9 @@ func (v *routerValidator) Immutable(new, old *RWTopology) error {
 	if err := v.generalValidator.Immutable(new, old); err != nil {
 		return err
 	}
-	if new.BR[v.id].InternalAddr.String() != old.BR[v.id].InternalAddr.String() {
+	if !sameInternalAddrSet(new.BR[v.id].InternalAddrs, old.BR[v.id].InternalAddrs) {
 		return serrors.New("InternalAddrs is immutable", "expected",
-			old.BR[v.id].InternalAddr, "actual", new.BR[v.id].InternalAddr)
+			old.BR[v.id].InternalAddrs, "actual", new.BR[v.id].InternalAddrs)
 	}
 	return nil
 }

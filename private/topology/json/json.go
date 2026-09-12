@@ -92,9 +92,23 @@ type ServerInfo struct {
 }
 
 // BRInfo contains Border Router specific information.
+//InternalAddr is legacy single underlay address and InternalAddrs is list of underlay addresses (dualstack)
 type BRInfo struct {
-	InternalAddr string                    `json:"internal_addr"`
+	InternalAddr string                    `json:"internal_addr,omitempty"`
+	InternalAddrs []string                 `json:"internal_addrs,omitempty"`
 	Interfaces   map[iface.ID]*BRInterface `json:"interfaces"`
+}
+
+//Returns effective list of internal addresses, InternalAddrs takes precedence,
+//if empty internalAddr is returned as one element list
+func (i BRInfo) AllInternalAddrs() []string {
+	if len(i.InternalAddrs) > 0 {
+		return i.InternalAddrs
+	}
+	if i.InternalAddr != "" {
+		return []string{i.InternalAddr}
+	}
+	return nil
 }
 
 // GatewayInfo contains SCION gateway information.
@@ -137,7 +151,7 @@ func (i ServerInfo) String() string {
 
 func (i BRInfo) String() string {
 	var s []string
-	s = append(s, fmt.Sprintf("Loc addrs:\n  %s\nInterfaces:", i.InternalAddr))
+	s = append(s, fmt.Sprintf("Loc addrs:\n  %s\nInterfaces:", strings.join(i.AllInternalAddrs(),",")))
 	for ifID, intf := range i.Interfaces {
 		s = append(s, fmt.Sprintf("%d: %+v", ifID, intf))
 	}

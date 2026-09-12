@@ -93,8 +93,8 @@ type (
 	// struct.
 	BRInfo struct {
 		Name string
-		// InternalAddr is the local data-plane address (for now it has to be a UDP underlay).
-		InternalAddr netip.AddrPort
+		// InternalAddrs is the local data-plane addresses (for now it has to be a UDP underlay).
+		InternalAddrs []netip.AddrPort
 		// IfIDs is a sorted list of the interface IDs.
 		IfIDs []iface.ID
 		// IFs is a map of interface IDs.
@@ -114,12 +114,12 @@ type (
 	// * The internal addr of the owning router: internal address.
 	// * The address on the link on the owning router's side: local address.
 	// * The address on the link on the far router's side: remote address.
-	// None of this describes the local router itself. Notably, InternalAddr is NOT that of the
+	// None of this describes the local router itself. Notably, InternalAddrs is NOT that of the
 	// local router.
 	IFInfo struct {
 		ID           iface.ID       // ID of this interface in the local AS.
 		BRName       string         // of the owning router
-		InternalAddr netip.AddrPort // of the owning router. It must be a udpip address.
+		InternalAddrs []netip.AddrPort // of the owning router. It must be a udpip address.
 		Provider     string         // Underlay provider name
 		Local        string         // Underlay addr on owning router side
 		Remote       string         // Underlay addr on far router side
@@ -165,6 +165,87 @@ func NewRWTopology() *RWTopology {
 		IFInfoMap:                 make(IfInfoMap),
 	}
 }
+
+//Returns first internal addr of the router or zero addr port if router has no internal addr
+func (b *BRInfo) PrimaryInternalAddr() netip.AddrPort{
+	if len(b.InternalAddrs) == 0 {
+		return netip.AddrPort{}
+	}
+	return b.InternalAddrs[0]
+}
+
+//Returns first internal addr of the router or zero addr port if router has no internal addr
+func (i *IFInfo) PrimaryInternalAddr() netip.AddrPort{
+	if len(i.InternalAddrs) == 0 {
+		return netip.AddrPort{}
+	}
+	return i.InternalAddrs[0]
+}
+
+//Returns Addrs in order ipv6 first and ipv4 next
+func canonicalizeInternalAddrs(addrs []netip.AddrPort) []netip.AddrPort{
+	if(len(addrs)<1){
+		return addrs
+	}
+	out := make([]netip.AddrPort,0,len(addrs))
+	for _,a := range addrs {
+		if a.Addr().Is6() && !a.Addr().Is4In6(){
+			out = append(out,a)
+		}
+	}
+	for _,a := range addrs {
+		if a.Addr().Is4() || a.Addr().Is4In6(){
+			out = append(out,a)
+		}
+	}
+
+	if len(out) != len(addrs){
+		for _,a := range addrs {
+			 isV6 := a.Addr().Is6() && !a.Addr().Is4In6()
+			 isV4 := a.Addr().Is4() && !a.Addr().Is4In6()
+			 if !isV6 && !isV4 {
+				out = append(out,a)
+			 }
+		}
+	}
+	return out
+}
+
+//Parses and validates list of internal addreses strings for single border router, rejects duplicates and same family collisions (ip family,port)
+// But explicitly allows addresses of different families sharing same port 
+func parseInternalAddrs(brName string, rawAddrs []string) ([]netip.AddrPort,error){
+	if (len(rawAddrs) == 0){
+		return nil, serrors.New("Missing Internal Address", "br",brName)
+	}
+	parsed := make([]netip.AddrPort,0,len(rawAddrs))
+	seenExact := make(map[netip.AddrPort]struct{},len(rawAddrs))
+
+	type famPort struct {
+		is6 bool
+		port uint16
+	}
+
+	seenFamPort := make(map[famPort]struct{},len(rawAddrs))
+
+	for _, raw := range rawAddrs {
+		ap, err := conn.ResolveAddrPort(raw)
+		if err != nil {
+			return nil, serrors.Wrap("Unable to extract underlay internal dataplane address", err, "br", brName, "addr", raw)
+		}
+		if _, dup := seenExact[ap]; dup{
+			return nil, serrors.New("duplicate Internal Addrs", "br", brName, "Addr", raw)
+		}
+		seenExact[ap]= struct{}{}
+		fp := famPort{is6: ap.Addr().Is6() && !ap.Addr().Is4In6(), port: ap.Port()}
+		if _, dup := seenFamPort[fp]; dup{
+			return nil, serrors.New("two internal addresses of same family share a port", "br", brName, "addr", ap)
+		}
+		seenFamPort[fp] = struct{}{}
+		parsed = append(parsed, ap)
+	}
+	return canonicalizeInternalAddrs(parsed), nil
+}
+
 
 // RWTopologyFromJSONTopology converts a parsed JSON struct topology to a topology usable by Go
 // code.
@@ -267,16 +348,16 @@ func validatePortRange(portRange string) (uint16, uint16, error) {
 
 func (t *RWTopology) populateBR(raw *jsontopo.Topology) error {
 	for name, rawBr := range raw.BorderRouters {
-		if rawBr.InternalAddr == "" {
-			return serrors.New("Missing Internal Address", "br", name)
+		if rawBr.InternalAddr != "" && len(rawBr.InternalAddrs)>0{
+			log.Info("Both Internal_Addr and Internal_Addrs are set, Internal Addrs takes precedence ", "Br", name )
 		}
-		intAddr, err := conn.ResolveAddrPort(rawBr.InternalAddr)
+		intAddrs, err := parseInternalAddrs(name, rawBr.AllInternalAddrs())
 		if err != nil {
-			return serrors.Wrap("unable to extract underlay internal data-plane address", err)
+			return serrors.Wrap("unable to extract underlay internal data-plane addresses", err)
 		}
 		brInfo := BRInfo{
 			Name:         name,
-			InternalAddr: intAddr,
+			InternalAddrs: intAddrs,
 			IFs:          make(map[iface.ID]*IFInfo),
 		}
 		for ifID, rawIntf := range rawBr.Interfaces {
@@ -289,7 +370,7 @@ func (t *RWTopology) populateBR(raw *jsontopo.Topology) error {
 			ifinfo := IFInfo{
 				ID:           ifID,
 				BRName:       name,
-				InternalAddr: intAddr,
+				InternalAddrs: intAddrs,
 				MTU:          rawIntf.MTU,
 			}
 			if ifinfo.IA, err = addr.ParseIA(rawIntf.IA); err != nil {
@@ -474,7 +555,7 @@ func (i *BRInfo) copy() *BRInfo {
 	}
 	return &BRInfo{
 		Name:         i.Name,
-		InternalAddr: i.InternalAddr,
+		InternalAddrs: append(i.InternalAddrs[:0:0],i.InternalAddrs...),
 		IfIDs:        append(i.IfIDs[:0:0], i.IfIDs...),
 		IFs:          copyIFsMap(i.IFs),
 	}
@@ -616,8 +697,8 @@ func (i IFInfo) CheckLinks(isCore bool, brName string) error {
 }
 
 func (i IFInfo) String() string {
-	return fmt.Sprintf("IFinfo: Name[%s] IntAddr[%+v] Local:%+v "+
-		"Remote:%+v IA:%s Type:%v MTU:%d", i.BRName, i.InternalAddr,
+	return fmt.Sprintf("IFinfo: Name[%s] IntAddrs[%+v] Local:%+v "+
+		"Remote:%+v IA:%s Type:%v MTU:%d", i.BRName, i.InternalAddrs,
 		i.Local, i.Remote, i.IA, i.LinkType, i.MTU)
 }
 
