@@ -23,7 +23,6 @@ import (
 	"fmt"
 	"hash"
 	"net"
-	"net/netip"
 	"sync"
 	"testing"
 	"time"
