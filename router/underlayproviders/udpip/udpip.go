@@ -847,7 +847,7 @@ func (u *provider) NewInternalLink(
 		c.links = make(map[netip.AddrPort]udpLink)
 	}
 
-	if len(u.internalConnection) == 0 {
+	if len(u.internalConnections) == 0 {
 		u.allLinks[netip.AddrPort{}] = il
 	}
 	u.allLinks[localAddr] = il
