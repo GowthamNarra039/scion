@@ -6,6 +6,7 @@ go_library(
     srcs = [
         "conf.go",
         "iactx.go",
+        "sibling.go"
     ],
     importpath = "github.com/scionproto/scion/router/control",
     visibility = ["//visibility:public"],
