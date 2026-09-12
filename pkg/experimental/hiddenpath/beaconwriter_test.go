@@ -373,7 +373,7 @@ func interfaceInfos(topo topology.Topology) map[uint16]ifstate.InterfaceInfo {
 			ID:           uint16(info.ID),
 			IA:           info.IA,
 			LinkType:     info.LinkType,
-			InternalAddr: netip.PrimaryInternalAddr(),
+			InternalAddr: info.PrimaryInternalAddr(),
 			RemoteID:     uint16(info.RemoteIfID),
 			MTU:          uint16(info.MTU),
 		}
