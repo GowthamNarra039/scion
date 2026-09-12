@@ -79,7 +79,11 @@ type provider struct {
 	allConnections     []*udpConnection
 	connOpener         ConnOpener // uo{}, except for unit tests
 	svc                *router.Services[netip.AddrPort]
-	internalConnection *udpConnection // Because we can share it w/ sibling links
+	// internalConnections holds one connection per internal address the router
+	// binds. A router may bind more than one (dual-stack). Sibling links that
+	// share the internal connection pick the connection whose bound address family matches 
+	// the chosen local sibling-link address. The first element is the primary.
+	internalConnections []*udpConnection // Because we can share it w/ sibling links
 	internalHashSeed   uint32         // ...in which case, this too is shared.
 	receiveBufferSize  int
 	sendBufferSize     int
@@ -205,6 +209,7 @@ func (u *provider) Stop() {
 type udpConnection struct {
 	conn         router.BatchConn
 	name         string                     // for logs. It's more informative than ifID.
+	localaddr    netip.AddrPort             //bound local address, zero for non internal connections
 	link         udpLink                    // Link with exclusive use of the connection.
 	links        map[netip.AddrPort]udpLink // Links that share this connection
 	queue        chan *router.Packet
@@ -650,7 +655,7 @@ func (u *provider) newDetachedLink(
 	metrics *router.InterfaceMetrics,
 ) (router.Link, error) {
 	// All detached links re-use the internal connection.
-	c := u.internalConnection
+	c := u.internalConnectionForFamily(remoteAddr.Addr())
 	if c == nil {
 		// The router isn't supposed to do this. This is an internal error.
 		panic("newSiblingLink called before newInternalLink")
@@ -781,22 +786,28 @@ type internalLink struct {
 }
 
 // NewInternalLink returns a internal link over the UdpIpUnderlay.
-//
+
+//It may be called more than once: a router may bind several internal addresses
+// (e.g. one IPv4 and one IPv6) to support a dual-stack internal network. Each
+// call opens a separate socket bound to the given local address and returns a
+// distinct link. Calling it twice with the same local address is an error
+// (previously this panicked unconditionally on the second call).
+
 // TODO(multi_underlay): We still go with the assumption that internal links are always
 // udpip, so we don't expect a string here. That should change.
 func (u *provider) NewInternalLink(
 	local string, qSize int, metrics *router.InterfaceMetrics,
 ) (router.Link, error) {
 	u.mu.Lock()
-	defer u.mu.Unlock()
-
-	if u.internalConnection != nil {
-		// We don't want to support this and the router doesn't do it. This is an internal error.
-		panic("More than one internal link")
-	}
+	defer u.mu.Unlock()	
 	localAddr, err := conn.ResolveAddrPort(local)
 	if err != nil {
 		return nil, serrors.Wrap("resolving local address", err)
+	}
+	for _, c := range u.internalConnections {
+		if c.localAddr == localAddr {
+			return nil, serrors.New("duplicate internal link", "addr", localAddr)
+		}
 	}
 	conn, err := u.connOpener.Open(
 		localAddr, netip.AddrPort{},
@@ -804,7 +815,9 @@ func (u *provider) NewInternalLink(
 	if err != nil {
 		return nil, err
 	}
-	u.internalHashSeed = makeHashSeed()
+	if u.internalHashSeed == 0 {
+		u.internalHashSeed = makeHashSeed()
+	}
 	queue := make(chan *router.Packet, qSize)
 	il := &internalLink{
 		egressQ:          queue,
@@ -817,7 +830,8 @@ func (u *provider) NewInternalLink(
 	}
 	c := &udpConnection{
 		conn: conn,
-		name: "internal",
+		name: "internal" + localAddr.String(),
+		localAddr: localAddr,
 		link: il,
 		// links: see below.
 		queue:        queue,
@@ -833,11 +847,31 @@ func (u *provider) NewInternalLink(
 		c.links = make(map[netip.AddrPort]udpLink)
 	}
 
-	u.allLinks[netip.AddrPort{}] = il
-	u.internalConnection = c
+	if len(u.internalConnection) == 0 {
+		u.allLinks[netip.AddrPort{}] = il
+	}
+	u.allLinks[localAddr] = il
+	u.internalConnections = append(u.internalConnections, c)
 	u.allConnections = append(u.allConnections, c)
 	return il, nil
 }
+
+//returns the internal connection whose bound local address matches the wanted family (ipv4 or ipv6)
+//if none matches falls back to first internal connection and returns nil if no internal conection exits
+func (u *provider) internalConnectionForFamily(want netip.Addr) *udpConnection {
+	if len(u.internalConnections) == 0 {
+		return nil
+	}
+	wantV6 := want.Is6() && !want.Is4In6()
+	for _, c := range u.internalConnections {
+		cV6 := c.localAddr.Addr().Is6() && !c.localAddr.Addr().Is4In6()
+		if cV6 == wantV6 {
+			return c
+		}
+	}
+	return u.internalConnections[0]
+}
+
 
 func (l *internalLink) start(
 	ctx context.Context,

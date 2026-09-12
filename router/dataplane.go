@@ -227,6 +227,11 @@ type dataPlane struct {
 	linkTypes           [math.MaxUint16 + 1]topology.LinkType
 	neighborIAs         [math.MaxUint16 + 1]addr.IA
 	localHost           addr.Host
+	//ifIDs of internal interfaces, in order they were added
+	//ifID0 is primary, router may bind more than one internal interface
+	internalIfIDs       []uint16
+	// localHostByIfID maps an internal interface ifID to its SCION host address.
+	localHostByIfID 	map[uint16]addr.Host
 	macFactory          func() hash.Hash
 	localIA             addr.IA
 	mtx                 sync.Mutex
@@ -412,8 +417,17 @@ func (d *dataPlane) SetPortRange(start, end uint16) {
 	d.dispatchedPortEnd = end
 }
 
+//internalIfIDBase is the ifID assigned to the second and subsequent internal
+// interfaces, counting downward from the top of the ifID space. The first
+// internal interface keeps ifID 0 for backward compatibility. Real (external)
+// interface IDs come from the topology and in practice never approach this
+// range, so collisions are not a concern
+const internalIfIDBase uint16 = math.MaxUint16
+
 // AddInternalInterface sets the interface the data-plane will use to send/receive traffic in the
-// local AS. This can only be called once; future calls will return an error. This can only be
+// local AS. This may be called more than once; a router may bind several internal addresses (e.g.
+// one IPv4 and one IPv6) to support a dual-stack internal network. The first call occupies ifID 0
+// (the primary); subsequent calls occupy ifIDs counting down from the top of the ifID space. This can only be
 // called on a not yet running dataplane. Note that localHost is a SCION host address. It currently
 // mirrors localAddr, which is the address on the local underlay network, but that could change
 // in the future. This is not the router's decision.
@@ -423,26 +437,68 @@ func (d *dataPlane) AddInternalInterface(localHost addr.Host, provider, localAdd
 	if d.isRunning() {
 		return errModifyExisting
 	}
-	if d.interfaces[0] != nil {
-		return serrors.JoinNoStack(errAlreadySet, nil, "ifID", 0)
+	// Pick the ifID: 0 for the first internal interface, then count downward.
+	var ifID uint16
+	if len(d.internalIfIDs) == 0 {
+		ifID = 0
+	} else {
+		ifID = internalIfIDBase - uint16(len(d.internalIfIDs)-1)
+	}
+	if d.interfaces[ifID] != nil {
+		return serrors.JoinNoStack(errAlreadySet, nil, "ifID", ifID)
 	}
 
-	// The internal network underlay is instantiated at construction to simplify some tests. Things
-	// would become a lot more complicated if we ever supported multiple internal underlays.
+	// The internal network underlay is instantiated at construction to simplify some tests. 
 	internalUnderlay := d.underlays[provider]
 	if internalUnderlay == nil {
 		return serrors.JoinNoStack(errNoSuchUnderlay, nil, "provider", provider)
 	}
-	iMetrics := newInterfaceMetrics(d.Metrics, 0, d.localIA, "", d.neighborIAs[0])
+	iMetrics := newInterfaceMetrics(d.Metrics, ifID, d.localIA, "", d.neighborIAs[0])
 	lk, err := internalUnderlay.NewInternalLink(localAddr, d.RunConfig.BatchSize, iMetrics)
 	if err != nil {
 		return err
 	}
-	d.interfaces[0] = lk
+	d.interfaces[ifID] = lk
 	d.numInterfaces++
-	d.localHost = localHost
+	d.internalIfIDs = append(d.internalIfIDs, ifID)
+	if d.localHostByIfID == nil {
+		d.localHostByIfID = make(map[uint16]addr.Host)
+	}
+	d.localHostByIfID[ifID] = localHost
+	if len(d.internalIfIDs) == 1 {
+		// Primary: preserve legacy single-host field used by SCMP/BFD paths.
+		d.localHost = localHost
+	}
 
 	return nil
+}
+
+// internalEgressForDst returns the ifID of the internal interface whose bound
+// address family matches the given destination host address. If the
+// destination is not an IP, or no family matches, it returns the primary
+// internal interface (ifID 0) and ok=true as long as at least one internal
+// interface exists. ok=false means the router has no internal interface.
+func (d *dataPlane) internalEgressForDst(dst addr.Host) (uint16, bool) {
+	if len(d.internalIfIDs) == 0 {
+		return 0, false
+	}
+	if len(d.internalIfIDs) == 1 || dst.Type() != addr.HostTypeIP {
+		return d.internalIfIDs[0], true
+	}
+	wantV6 := dst.IP().Is6() && !dst.IP().Is4In6()
+	for _, ifID := range d.internalIfIDs {
+		h, ok := d.localHostByIfID[ifID]
+		if !ok || h.Type() != addr.HostTypeIP {
+			continue
+		}
+		hV6 := h.IP().Is6() && !h.IP().Is4In6()
+		if hV6 == wantV6 {
+			return ifID, true
+		}
+	}
+	// No family match: fall back to primary. The send may still fail at the
+	// socket, but this preserves single-stack behavior and is observable.
+	return d.internalIfIDs[0], true
 }
 
 // AddExternalInterface adds the inter AS connection for the given interface ID.
@@ -1904,6 +1960,17 @@ func (d *dataPlane) resolveLocalDst(
 		}
 	}
 
+	// Select the internal interface whose address family matches the
+	// destination. With a single-stack router this is always the primary (ifID
+	// 0) and behavior is unchanged. With a dual-stack router this routes an
+	// IPv6 destination out the IPv6 socket and an IPv4 destination out the IPv4
+	// socket, since the underlay cannot send across families.
+	egress, ok := d.internalEgressForDst(a)
+	if !ok {
+		return errInvalidDstAddr
+	}
+	packet.egress = egress
+	
 	// Let the internal (it better be) link resolve the destination to an underlay address.
 	return d.interfaces[packet.egress].Resolve(packet, a, p)
 }
