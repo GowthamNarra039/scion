@@ -151,7 +151,7 @@ func (i ServerInfo) String() string {
 
 func (i BRInfo) String() string {
 	var s []string
-	s = append(s, fmt.Sprintf("Loc addrs:\n  %s\nInterfaces:", strings.join(i.AllInternalAddrs(),",")))
+	s = append(s, fmt.Sprintf("Loc addrs:\n  %s\nInterfaces:", strings.Join(i.AllInternalAddrs(),",")))
 	for ifID, intf := range i.Interfaces {
 		s = append(s, fmt.Sprintf("%d: %+v", ifID, intf))
 	}
