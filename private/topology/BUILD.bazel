@@ -35,6 +35,7 @@ go_test(
         "servicetype_test.go",
         "topology_test.go",
         "types_test.go",
+        "dualstack_test.go",
         "validator_test.go",
     ],
     data = glob(["testdata/**"]),
