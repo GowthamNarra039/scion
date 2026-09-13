@@ -89,7 +89,11 @@ type Interface struct {
 	InterfaceId int `json:"interface_id"`
 
 	// InternalInterface The address of internal SCION interface of the router.
+	//Deprecated, use InternalInterfaces instead
+	//populated with primary internal address for backward compatibility
 	InternalInterface string            `json:"internal_interface"`
+	//InternalInterfaces, all internal SCION interface addresses of the router (IPV4 and IPV6)
+	InternalInterfaces *[]string		`json:"internal_interfaces,omitempty"`
 	Neighbor          InterfaceNeighbor `json:"neighbor"`
 	Relationship      LinkRelationship  `json:"relationship"`
 
@@ -156,7 +160,11 @@ type SiblingInterface struct {
 	InterfaceId int `json:"interface_id"`
 
 	// InternalInterface Internal address of the sibling router.
+	//Deprecated, use InternalInterfaces instead
+	//populated with primary internal address for backward compatibility
 	InternalInterface string           `json:"internal_interface"`
+	//InternalInterfaces, all internal SCION interface addresses of the router (IPV4 and IPV6)
+	InternalInterfaces *[]string 	   `json:"internal_interfaces,omitempty"`
 	Neighbor          SiblingNeighbor  `json:"neighbor"`
 	Relationship      LinkRelationship `json:"relationship"`
 

@@ -95,6 +95,17 @@ func (s *Server) GetInterfaces(w http.ResponseWriter, r *http.Request) {
 		}
 		return "undefined"
 	}
+	// findInternalInterfaces returns every internal address for the IA. A
+	// dual-stack router has more than one (e.g. an IPv4 and an IPv6 address).
+	findInternalInterfaces := func(ia addr.IA) []string {
+		var addrs []string
+		for _, intf := range internalInterfaces {
+			if intf.IA.Equal(ia) {
+				addrs = append(addrs, intf.Addr)
+			}
+		}
+		return addrs
+	}
 	for _, intf := range externalInterfaces {
 		newInterface := Interface{
 			Bfd: BFD{
@@ -105,6 +116,7 @@ func (s *Server) GetInterfaces(w http.ResponseWriter, r *http.Request) {
 			},
 			InterfaceId:       int(intf.IfID), // nolint - name from published API.
 			InternalInterface: findInternalInterface(intf.Link.Local.IA),
+			InternalInterfaces: refStrings(findInternalInterfaces(intf.Link.Local.IA)),
 			Neighbor: InterfaceNeighbor{
 				Address: intf.Link.Remote.Addr,
 				IsdAs:   intf.Link.Remote.IA.String(),
@@ -122,6 +134,7 @@ func (s *Server) GetInterfaces(w http.ResponseWriter, r *http.Request) {
 			InterfaceId: int(intf.IfID), // nolint - name from published API.
 			// The name InternalInterface is poorly chosen but enshrined in the schema.
 			InternalInterface: intf.InternalAddress,
+			InternalInterfaces: refStrings([]string{intf.InternalAddress}),
 			Neighbor: SiblingNeighbor{
 				IsdAs: intf.NeighborIA.String(),
 			},
@@ -148,6 +161,15 @@ func (s *Server) GetInterfaces(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
+}
+
+// refStrings returns a pointer to the given slice, or nil if it is empty, for
+// use with optional (omitempty) generated API fields.
+func refStrings(s []string) *[]string {
+	if len(s) == 0 {
+		return nil
+	}
+	return &s
 }
 
 // Error creates an detailed error response.
