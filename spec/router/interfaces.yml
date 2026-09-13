@@ -138,7 +138,7 @@ components:
           description: SCION interface identifier.
           type: integer
           example: 3
-            internal_interface:
+        internal_interface:
           description: >-
             Internal address of the sibling router. Deprecated in favor of
             internal_interfaces; populated with the primary internal
