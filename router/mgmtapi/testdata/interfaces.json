@@ -50,7 +50,7 @@
             "interface_id": 5,
             "internal_interface": "172.20.0.5:50000",
             "internal_interfaces": [
-                "172.20.0.3:50000"
+                "172.20.0.5:50000"
             ],
             "neighbor": {
                 "address": "172.20.0.6:50000",
@@ -83,7 +83,7 @@
             "interface_id": 5,
             "internal_interface": "172.20.0.20:30042",
             "internal_interfaces": [
-                "172.20.0.3:50000"
+                "172.20.0.20:30042"
             ],
             "neighbor": {
                 "isd_as": "1-ff00:0:112"
