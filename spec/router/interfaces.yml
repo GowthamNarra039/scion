@@ -106,9 +106,23 @@ components:
         relationship:
           $ref: "../common/scion.yml#/components/schemas/LinkRelationship"
         internal_interface:
-          description: The address of internal SCION interface of the router.
+          description: >-
+            The address of internal SCION interface of the router.
+            Deprecated in favor of internal_interfaces; populated with the
+            primary internal address for backward compatibility.
+          deprecated: true
           type: string
           example: 192.168.2.2:31000
+        internal_interfaces:
+          description: >-
+            All internal interface addresses of the router. A dual-stack
+            router may bind more than one (IPv4 and an IPv6 address).
+          type: array
+          items:
+            type: string
+          example:
+            - 192.168.2.2:31000
+            - "[2001:db8::2]:31000"
     SiblingInterface:
       title: Sibling Interfaces
       type: object
@@ -124,10 +138,21 @@ components:
           description: SCION interface identifier.
           type: integer
           example: 3
-        internal_interface:
-          description: Internal address of the sibling router.
+                internal_interface:
+          description: >-
+            Internal address of the sibling router. Deprecated in favor of
+            internal_interfaces; populated with the primary internal
+            address for backward compatibility.
+          deprecated: true
           type: string
           example: 192.168.2.2:31000
+        internal_interfaces:
+          description: All internal addresses of the sibling router (dual-stack).
+          type: array
+          items:
+            type: string
+          example:
+            - 192.168.2.2:31000
         neighbor:
           $ref: "#/components/schemas/SiblingNeighbor"
         scion_mtu:
